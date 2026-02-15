@@ -1,0 +1,257 @@
+You are given a task to integrate an existing React component in the codebase
+
+The codebase should support:
+- shadcn project structure  
+- Tailwind CSS
+- Typescript
+
+If it doesn't, provide instructions on how to setup project via shadcn CLI, install Tailwind or Typescript.
+
+Determine the default path for components and styles. 
+If default path for components is not /components/ui, provide instructions on why it's important to create this folder
+Copy-paste this component to /components/ui folder:
+```tsx
+etheral-shadow.tsx
+'use client';
+
+import React, { useRef, useId, useEffect, CSSProperties } from 'react';
+import { animate, useMotionValue, AnimationPlaybackControls } from 'framer-motion';
+
+// Type definitions
+interface ResponsiveImage {
+    src: string;
+    alt?: string;
+    srcSet?: string;
+}
+
+interface AnimationConfig {
+    preview?: boolean;
+    scale: number;
+    speed: number;
+}
+
+interface NoiseConfig {
+    opacity: number;
+    scale: number;
+}
+
+interface ShadowOverlayProps {
+    type?: 'preset' | 'custom';
+    presetIndex?: number;
+    customImage?: ResponsiveImage;
+    sizing?: 'fill' | 'stretch';
+    color?: string;
+    animation?: AnimationConfig;
+    noise?: NoiseConfig;
+    style?: CSSProperties;
+    className?: string;
+}
+
+function mapRange(
+    value: number,
+    fromLow: number,
+    fromHigh: number,
+    toLow: number,
+    toHigh: number
+): number {
+    if (fromLow === fromHigh) {
+        return toLow;
+    }
+    const percentage = (value - fromLow) / (fromHigh - fromLow);
+    return toLow + percentage * (toHigh - toLow);
+}
+
+const useInstanceId = (): string => {
+    const id = useId();
+    const cleanId = id.replace(/:/g, "");
+    const instanceId = `shadowoverlay-${cleanId}`;
+    return instanceId;
+};
+
+export function Component({
+    sizing = 'fill',
+    color = 'rgba(128, 128, 128, 1)',
+    animation,
+    noise,
+    style,
+    className
+}: ShadowOverlayProps) {
+    const id = useInstanceId();
+    const animationEnabled = animation && animation.scale > 0;
+    const feColorMatrixRef = useRef<SVGFEColorMatrixElement>(null);
+    const hueRotateMotionValue = useMotionValue(180);
+    const hueRotateAnimation = useRef<AnimationPlaybackControls | null>(null);
+
+    const displacementScale = animation ? mapRange(animation.scale, 1, 100, 20, 100) : 0;
+    const animationDuration = animation ? mapRange(animation.speed, 1, 100, 1000, 50) : 1;
+
+    useEffect(() => {
+        if (feColorMatrixRef.current && animationEnabled) {
+            if (hueRotateAnimation.current) {
+                hueRotateAnimation.current.stop();
+            }
+            hueRotateMotionValue.set(0);
+            hueRotateAnimation.current = animate(hueRotateMotionValue, 360, {
+                duration: animationDuration / 25,
+                repeat: Infinity,
+                repeatType: "loop",
+                repeatDelay: 0,
+                ease: "linear",
+                delay: 0,
+                onUpdate: (value: number) => {
+                    if (feColorMatrixRef.current) {
+                        feColorMatrixRef.current.setAttribute("values", String(value));
+                    }
+                }
+            });
+
+            return () => {
+                if (hueRotateAnimation.current) {
+                    hueRotateAnimation.current.stop();
+                }
+            };
+        }
+    }, [animationEnabled, animationDuration, hueRotateMotionValue]);
+
+    return (
+        <div
+            className={className}
+            style={{
+                overflow: "hidden",
+                position: "relative",
+                width: "100%",
+                height: "100%",
+                ...style
+            }}
+        >
+            <div
+                style={{
+                    position: "absolute",
+                    inset: -displacementScale,
+                    filter: animationEnabled ? `url(#${id}) blur(4px)` : "none"
+                }}
+            >
+                {animationEnabled && (
+                    <svg style={{ position: "absolute" }}>
+                        <defs>
+                            <filter id={id}>
+                                <feTurbulence
+                                    result="undulation"
+                                    numOctaves="2"
+                                    baseFrequency={`${mapRange(animation.scale, 0, 100, 0.001, 0.0005)},${mapRange(animation.scale, 0, 100, 0.004, 0.002)}`}
+                                    seed="0"
+                                    type="turbulence"
+                                />
+                                <feColorMatrix
+                                    ref={feColorMatrixRef}
+                                    in="undulation"
+                                    type="hueRotate"
+                                    values="180"
+                                />
+                                <feColorMatrix
+                                    in="dist"
+                                    result="circulation"
+                                    type="matrix"
+                                    values="4 0 0 0 1  4 0 0 0 1  4 0 0 0 1  1 0 0 0 0"
+                                />
+                                <feDisplacementMap
+                                    in="SourceGraphic"
+                                    in2="circulation"
+                                    scale={displacementScale}
+                                    result="dist"
+                                />
+                                <feDisplacementMap
+                                    in="dist"
+                                    in2="undulation"
+                                    scale={displacementScale}
+                                    result="output"
+                                />
+                            </filter>
+                        </defs>
+                    </svg>
+                )}
+                <div
+                    style={{
+                        backgroundColor: color,
+                        maskImage: `url('https://framerusercontent.com/images/ceBGguIpUU8luwByxuQz79t7To.png')`,
+                        maskSize: sizing === "stretch" ? "100% 100%" : "cover",
+                        maskRepeat: "no-repeat",
+                        maskPosition: "center",
+                        width: "100%",
+                        height: "100%"
+                    }}
+                />
+            </div>
+
+            <div
+                style={{
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    transform: "translate(-50%, -50%)",
+                    textAlign: "center",
+                    zIndex: 10
+                }}
+            >
+                <h1 className="md:text-7xl text-6xl lg:text-8xl font-bold text-center text-foreground relative z-20">
+                    Etheral Shadows
+                </h1>
+            </div>
+
+            {noise && noise.opacity > 0 && (
+                <div
+                    style={{
+                        position: "absolute",
+                        inset: 0,
+                        backgroundImage: `url("https://framerusercontent.com/images/g0QcWrxr87K0ufOxIUFBakwYA8.png")`,
+                        backgroundSize: noise.scale * 200,
+                        backgroundRepeat: "repeat",
+                        opacity: noise.opacity / 2
+                    }}
+                />
+            )}
+        </div>
+    );
+}
+
+demo.tsx
+import { Component } from "@/components/ui/etheral-shadow";
+
+const DemoOne = () => {
+  return (
+    <div className="flex w-full h-screen justify-center items-center">
+      <Component
+      color="rgba(128, 128, 128, 1)"
+        animation={{ scale: 100, speed: 90 }}
+        noise={{ opacity: 1, scale: 1.2 }}
+        sizing="fill"
+         />
+    </div>
+  );
+};
+
+export { DemoOne };
+
+```
+
+Install NPM dependencies:
+```bash
+framer-motion
+```
+
+Implementation Guidelines
+ 1. Analyze the component structure and identify all required dependencies
+ 2. Review the component's argumens and state
+ 3. Identify any required context providers or hooks and install them
+ 4. Questions to Ask
+ - What data/props will be passed to this component?
+ - Are there any specific state management requirements?
+ - Are there any required assets (images, icons, etc.)?
+ - What is the expected responsive behavior?
+ - What is the best place to use this component in the app?
+
+Steps to integrate
+ 0. Copy paste all the code above in the correct directories
+ 1. Install external dependencies
+ 2. Fill image assets with Unsplash stock images you know exist
+ 3. Use lucide-react icons for svgs or logos if component requires them
